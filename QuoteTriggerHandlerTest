@@ -1,0 +1,225 @@
+@isTest
+public class QuoteTriggerHandlerTest {
+    @isTest  
+    public static void testClonewithLineItem() {
+        // Create test data
+        Account acc = new Account(Name = 'Merfantz Test');
+        insert acc;
+        
+        
+        Quote__c quote1 = new Quote__c();
+        
+        quote1.Clone_With_LineItems__c=true;
+        quote1.Account__c = acc.Id;
+        quote1.Service_Type__c = 'Consultancy';
+        quote1.Clone_With_LineItems__c = true;
+        quote1.Enquiry_source__c = 'Existing customer';
+        quote1.Installation_Type__c = 'Non-installation';
+        quote1.FOLLOW_UP_CONTACT__c = 'Adrian Martin';
+        quote1.Sales_Pipeline_Stage__c = 'Quote Not Sent';
+        quote1.Date_Quote_Was_Closed__c = System.today();
+        quote1.Won_reason_Main_Reason__c = 'Our short lead-time for install';
+        quote1.Initial_Enquiry_Stage__c = 'Non-installation';
+        insert quote1;
+        
+        Quote__c quote = new Quote__c();
+        quote.Cloned_From__c=quote1.id;
+        quote.Clone_With_LineItems__c=true;
+        quote.Account__c = acc.Id;
+        quote.Service_Type__c = 'Consultancy';
+        quote.Clone_With_LineItems__c = true;
+        quote.Enquiry_source__c = 'Existing customer';
+        quote.Installation_Type__c = 'Non-installation';
+        quote.FOLLOW_UP_CONTACT__c = 'Adrian Martin';
+        quote.Sales_Pipeline_Stage__c = 'Quote Not Sent';
+        quote.Date_Quote_Was_Closed__c = System.today();
+        quote.Won_reason_Main_Reason__c = 'Our short lead-time for install';
+        quote.Initial_Enquiry_Stage__c = 'Non-installation';
+        insert quote;
+        
+        system.debug('quote.id'+quote.Id);
+        
+        Quote_Line_Item__c lineItem = new Quote_Line_Item__c();
+        lineItem.Quote__c =quote1.Id;
+        lineItem.Code__c = 'Code';
+        lineItem.Common_Services__c = 'Common Services';
+        lineItem.Each_Item__c = true;
+        lineItem.Goods_Services__c = 'Goods Services';
+        lineItem.Include_Information__c = true;       
+        lineItem.Per__c = 'Per';
+        lineItem.Quantity__c = 5;
+        lineItem.Service_Types__c = 'Service Types';
+        lineItem.Sub_Total__c = 50;
+        lineItem.Value__c = 100;
+        insert lineItem;
+        system.debug('quote.id'+quote.Id);
+        // Create a map with the test data
+        Map<Id, Quote__c> quoteMap = new Map<Id, Quote__c>{ quote.Id => quote };
+            
+            Test.startTest();
+        QuoteTriggerHandler qt =new QuoteTriggerHandler();
+        // Call the method being tested
+        qt.ClonewithLineItem(quoteMap);
+        Test.stopTest();
+        
+        // Verify the results
+        List<Quote_Line_Item__c> clonedLineItems = [SELECT Id, Quote__c, Code__c, Common_Services__c, Each_Item__c, Goods_Services__c, Include_Information__c, Item__c, Per__c, Quantity__c, Service_Types__c, Sub_Total__c, Value__c FROM Quote_Line_Item__c];
+        
+    }
+    
+    @isTest
+    public static void testAmountOnQuote() {
+        // Create test data
+        Account acc = new Account(Name = 'Merfantz Test');
+        insert acc;
+        
+        Opportunity opp = new Opportunity(
+            Name = 'Merfantz Test Opp',
+            AccountId = acc.Id,
+            CloseDate = System.today(),
+            StageName = 'Closed Won',
+            Date_when_letting_package__c = 'test',
+            Amount = 30,
+            Type = 'New Business',
+            Sale_Type__c = 'Installation Sale',
+            Total_Amount_With_SalesPipeline__c = null
+        );
+        insert opp;
+        
+        Quote__c quote = new Quote__c(
+            Account__c = acc.Id,
+            Service_Type__c = 'Consultancy',
+            Clone_With_LineItems__c = true,
+            Enquiry_source__c = 'Existing customer',
+            Installation_Type__c = 'Non-installation',
+            FOLLOW_UP_CONTACT__c = 'Adrian Martin',
+            Sales_Pipeline_Stage__c = 'Quote Not Sent',
+            Date_Quote_Was_Closed__c = System.today(),
+            Won_reason_Main_Reason__c = 'Our short lead-time for install',
+            Initial_Enquiry_Stage__c = 'Non-installation'
+        );
+        insert quote;
+        
+        Quote__c q = new Quote__c(
+            Account__c = acc.Id,
+            Service_Type__c = 'Consultancy',
+            Cloned_From__c = quote.Id,
+            Enquiry_source__c = 'Existing customer',
+            Installation_Type__c = 'Non-installation',
+            FOLLOW_UP_CONTACT__c = 'Adrian Martin',
+            Sales_Pipeline_Stage__c = 'Quote Sent',
+            Date_Quote_Was_Closed__c = System.today() + 1,
+            Won_reason_Main_Reason__c = 'Our short lead-time for install',
+            Initial_Enquiry_Stage__c = 'Non-installation'
+        );
+        insert q;
+        
+        Quote__c qu = new Quote__c(
+            Account__c = acc.Id,
+            Service_Type__c = 'Consultancy',
+            Clone_With_LineItems__c = true,
+            Enquiry_source__c = 'Existing customer',
+            Installation_Type__c = 'Non-installation',
+            FOLLOW_UP_CONTACT__c = 'Adrian Martin',
+            Sales_Pipeline_Stage__c = 'Won',
+            Date_Quote_Was_Closed__c = System.today() + 1,
+            Won_reason_Main_Reason__c = 'Our short lead-time for install',
+            Initial_Enquiry_Stage__c = 'Non-installation'
+        );
+        insert qu;
+        
+        qu.Date_Quote_Was_Closed__c = System.today() + 3;
+        update qu;
+        
+        // Add assertions to verify the expected behavior
+    }
+
+
+    
+@isTest
+public static void testAmountOnQuoteDelete() {
+    // Create test data
+    Account acc = new Account(Name = 'Merfantz Test');
+    insert acc;
+    
+    Opportunity opp = new Opportunity(
+        Name = 'Merfantz Test Opp',
+        AccountId = acc.Id,
+        CloseDate = System.today(),
+        StageName = 'Closed Won',
+        Date_when_letting_package__c = 'test',
+        Amount = 30,
+        Type = 'New Business',
+        Sale_Type__c = 'Installation Sale',
+        Total_Amount_With_SalesPipeline__c = null
+    );
+    insert opp;
+    
+    Quote__c quote = new Quote__c(
+        Account__c = acc.Id,
+        Service_Type__c = 'Consultancy',
+        Clone_With_LineItems__c = true,
+        Enquiry_source__c = 'Existing customer',
+        Installation_Type__c = 'Non-installation',
+        FOLLOW_UP_CONTACT__c = 'Adrian Martin',
+        Sales_Pipeline_Stage__c = 'Quote Not Sent',
+        Date_Quote_Was_Closed__c = System.today(),
+        Won_reason_Main_Reason__c = 'Our short lead-time for install',
+        Initial_Enquiry_Stage__c = 'Non-installation'
+    );
+    insert quote;
+    
+    Quote__c q = new Quote__c(
+        Account__c = acc.Id,
+        Service_Type__c = 'Consultancy',
+        Cloned_From__c = quote.Id,
+        Clone_With_LineItems__c = true,
+        Enquiry_source__c = 'Existing customer',
+        Installation_Type__c = 'Non-installation',
+        FOLLOW_UP_CONTACT__c = 'Adrian Martin',
+        Sales_Pipeline_Stage__c = 'Quote Sent',
+        Date_Quote_Was_Closed__c = System.today() + 1,
+        Won_reason_Main_Reason__c = 'Our short lead-time for install',
+        Initial_Enquiry_Stage__c = 'Non-installation'
+    );
+    insert q;
+    
+    Quote__c qu = new Quote__c(
+        Account__c = acc.Id,
+        Opportunity__c = opp.Id,
+        Service_Type__c = 'Consultancy',
+        Enquiry_source__c = 'Existing customer',
+        Installation_Type__c = 'Non-installation',
+        FOLLOW_UP_CONTACT__c = 'Adrian Martin',
+        Sales_Pipeline_Stage__c = 'Won',
+        Date_Quote_Was_Closed__c = System.today() + 1,
+        Won_reason_Main_Reason__c = 'Our short lead-time for install',
+        Initial_Enquiry_Stage__c = 'Non-installation'
+    );
+    insert qu;
+    
+    delete qu;
+    
+    // Perform the logic being tested
+    Test.startTest();
+    QuoteTriggerHandler.updateOpportunityAmountOnQuoteDelete(new Set<Id>{ opp.Id });
+    Test.stopTest();
+    
+    // Retrieve the updated Opportunity record
+    Opportunity updatedOpp = [SELECT Total_Amount_With_SalesPipeline__c FROM Opportunity WHERE Id = :opp.Id];
+    
+    // Add assertions to verify the expected behavior
+    System.assertEquals(0, updatedOpp.Total_Amount_With_SalesPipeline__c, 'Total_Amount_With_SalesPipeline__c should be updated to 0');
+    
+    // Verify the behavior of getOpportunityAmountsByAccount method
+    Set<Id> quoteIds = new Set<Id>{ quote.Id };
+    Map<Id, Decimal> opportunityAmounts = QuoteTriggerHandler.getOpportunityAmountsByAccount(quoteIds);
+
+    
+    
+   
+}
+
+
+
+}
