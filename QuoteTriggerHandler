@@ -1,0 +1,227 @@
+/*============================================================================================================
+*Class Name     : QuoteTriggerHandler
+*Description    : All the implementations related to QuoteTriggers should be handled here
+*Company        : Merfantz Technology Solutions (Venkat)
+*Date           : 10th Mar, 2016
+*Version        : 1.0
+*Change History : Initial Trigger Handler
+*Methods        : public void OnAfterUpdate(Map<id,Quote__c> QTNewMap,Map<Id,Quote__c> QTOldMap)
+Public void OnAfterInsert(map<id,Quote__c> QTNewMap)
+Public void OnBeforeUpdate(List<Quote__c> QTNew)
+Public void OnBeforeInsert(List<Quote__c> QTNew)
+*Change History : 112185 - Opportunity - Amount field
+*Date           : 22th, May, 2023
+*Methods        : updateOpportunityAmounts()
+: deleteOpportunityAmounts()
+*============================================================================================================*/
+
+public class QuoteTriggerHandler{
+    
+    //public void OnAfterUpdate(Map<Id,Quote__c> QTOldMap,Map<id,Quote__c> QTNewMap){
+    //}
+    
+    public void OnAfterInsert(map<id,Quote__c> QTNewMap)
+    {
+        ClonewithLineItem(QTNewMap);
+    }
+    
+    //public void OnBeforeUpdate(List<Quote__c> QTNew){
+    
+    //}
+    
+    public void OnBeforeInsert(List<Quote__c> QTNew){
+        
+    }
+    
+    
+    public void ClonewithLineItem(map<id,Quote__c> QTNewMap){    
+        List<string> Clolist=new List<String>();
+        Map<string,list<Quote_Line_Item__c>> qlimap = new Map<string,list<Quote_Line_Item__c>>();
+        List<Quote_Line_Item__c> AllClonedqli = new List<Quote_Line_Item__c>();        
+        
+        
+        for(Quote__c qt:QTNewMap.values()){
+            if(qt.Cloned_From__c!=null&&qt.Clone_With_LineItems__c){
+                Clolist.add(String.valueOf(qt.Cloned_From__c));
+            }
+        }
+        if(Clolist.size()>0)
+            AllClonedqli=[select id,/*Recordtype.name,*/Code__c,Item_Code__c,Common_Services__c,Item_Description__c,Sub_Total__c,Each_Item__c,Goods_Services__c,Include_Information__c,Item__c,Per__c,Quantity__c,Quote__c,Service_Types__c,Totals__c,Value__c from Quote_Line_Item__c where Quote__c In :Clolist];        
+        for(Quote_Line_Item__c qli:AllClonedqli){
+            if(qlimap.containskey(String.valueOf(qli.Quote__c)))
+                qlimap.get(String.valueOf(qli.Quote__c)).add(qli);
+            else
+                qlimap.put(String.valueOf(qli.Quote__c),new list<Quote_Line_Item__c>{qli});
+        }
+        
+        List<Quote_Line_Item__c> qtypes=new List<Quote_Line_Item__c>(); 
+        /*   Id ExclueRecordTypeId = Schema.SObjectType.Quote_Line_Item__c.getRecordTypeInfosByName().get('Exclude Price and Per').getRecordTypeId();
+Id IncludeRecordTypeId = Schema.SObjectType.Quote_Line_Item__c.getRecordTypeInfosByName().get('Include Price and Per').getRecordTypeId(); */
+        /*   Map<string,recordtype> qlirtype=new Map<string,recordtype>();
+for(recordtype rt:[select id,name from recordtype where sobjecttype='Quote_Line_Item__c']) {
+qlirtype.put(rt.name,rt);
+} */
+        Quote_Line_Item__c qtype;      
+        for(Quote__c qli:QTNewMap.values()){
+            if(qlimap.containskey(String.valueOf(qli.Cloned_From__c))){  
+                for(Quote_Line_Item__c qlits :qlimap.get(String.valueOf(qli.Cloned_From__c))){              
+                    qtype=new Quote_Line_Item__c();
+                    qtype.Quote__c=qli.id;
+                    System.debug('li===='+qlits);
+                    /*    if(qlirtype.containskey(qlits.Recordtype.name))
+{
+qtype.recordtypeid=qlirtype.get(qlits.Recordtype.name).id;
+} 
+*/
+                    qtype.Code__c=qlits.Code__c;
+                    //qtype.Item_Code__c=qlits.Item_Code__c;
+                    qtype.Common_Services__c=qlits.Common_Services__c;
+                    //qtype.Item_Description__c=qlits.Item_Description__c;
+                    qtype.Each_Item__c=qlits.Each_Item__c;
+                    qtype.Goods_Services__c =qlits.Goods_Services__c ;
+                    qtype.Include_Information__c=qlits.Include_Information__c;
+                    qtype.Item__c=qlits.Item__c;
+                    qtype.Per__c=qlits.Per__c;
+                    qtype.Quantity__c=qlits.Quantity__c;
+                    qtype.Service_Types__c =qlits.Service_Types__c ;
+                    qtype.Sub_Total__c=qlits.Sub_Total__c;
+                    //qtype.Totals__c=qlits.Totals__c;
+                    //qtype.recordtype.name=qlits.recordtype.name;
+                    qtype.Item__c =qlits.Item__c;
+                    qtype.Value__c=qlits.Value__c;
+                    qtypes.add(qtype);
+                }
+            }
+        }
+        if(qtypes.size()>0)
+            insert qtypes;
+        
+    }
+    
+    /*============================================================================================================
+*Class Name     : QuoteTriggerHandler
+*Description    : All the implementations related to Quote total amount update to opportunity
+*Company        : Merfantz Technology Solutions 
+*Date           : 16th May, 2023
+*Version        : 1.0
+*Methods        : 
+
+*============================================================================================================*/
+    //when Quote Is Update Or Insert In Total Amount  Is updated In Opportunity Total Amount 
+    @future
+    public static void updateOpportunityAmountOnQuote(Set<Id> quoteIds) {
+        // Get Quotes to Update
+        List<Quote__c> quotes = queryQuotesById(quoteIds);
+        
+        // Loop Quotes and set Total Amount
+        Set<Id> oppIds = new Set<Id>();
+        for (Quote__c quote : quotes) {
+            // Determine if Total Amount has Changed
+            oppIds.add(quote.Opportunity__c); // Add quote to collection to be updated
+        }
+        
+        Map<Id, Decimal> results = getOpportunityAmountsByAccountId(oppIds);
+        List<Opportunity> opportunityToUpdate = new List<Opportunity>();
+        for (Opportunity opp : [SELECT Id, Total_Amount_With_SalesPipeline__c FROM Opportunity WHERE Id IN :oppIds]) {
+            Decimal total = 0;
+            if (results.containsKey(opp.Id)) {
+                total = results.get(opp.Id);
+            }
+            if (opp.Total_Amount_With_SalesPipeline__c != total) {
+                opp.Total_Amount_With_SalesPipeline__c = total;
+                opportunityToUpdate.add(opp); //Add account to collection to be updated
+            }
+        }
+        
+        if (!opportunityToUpdate.isEmpty()) {
+            Database.SaveResult[] saveResults = Database.update(opportunityToUpdate, false);
+            System.debug(saveResults);
+        }
+    }
+    
+    // Private Methods
+    public static Map<Id, Decimal> getOpportunityAmountsByAccountId(Set<Id> quoteIds) {
+        Map<Id, Decimal> resultsByQuoteId = new Map<Id, Decimal>();
+        
+        // Summarize Won Opportunity Amounts by Quote Id
+        AggregateResult[] results = aggregateQuoteAmounts(quoteIds);
+        for (AggregateResult result : results) {
+            Id oppId = (Id) result.get('Opportunity__c');
+            Decimal total = (Decimal) result.get('totalAmount');
+            resultsByQuoteId.put(oppId, total);
+        }
+        
+        return resultsByQuoteId;
+    }
+    
+    // Query Methods
+    private static List<Quote__c> queryQuotesById(Set<Id> quoteIds) {
+        return [
+            SELECT Id, Total_Amount__c, Opportunity__c
+            FROM Quote__c
+            WHERE Id IN :quoteIds
+        ];
+    }
+    
+    private static AggregateResult[] aggregateQuoteAmounts(Set<Id> oppIds) {
+        return [
+            SELECT Opportunity__c, SUM(Total_Amount__c) totalAmount
+            FROM Quote__c
+            WHERE Opportunity__c IN :oppIds
+            AND (Sales_Pipeline_Stage__c = 'Quote Not Sent' OR Sales_Pipeline_Stage__c = 'Quote Sent' OR Sales_Pipeline_Stage__c = 'Won')
+            GROUP BY Opportunity__c
+        ];
+    }
+    
+    @future
+    public static void updateOpportunityAmountOnQuoteDelete(Set<Id> quoteIds) {
+        
+        Map<Id, Decimal> results = getOpportunityAmountsByAccountId(quoteIds);
+        List<Opportunity> opportunityToUpdate = new List<Opportunity>();
+        for (Opportunity opp : [SELECT Id, Total_Amount_With_SalesPipeline__c FROM Opportunity WHERE Id IN :quoteIds]) {
+            Decimal total = 0;
+            if (results.containsKey(opp.Id)&&results.size()>0) {
+                total = results.get(opp.Id);
+            }else
+                total=0;
+            if (opp.Total_Amount_With_SalesPipeline__c != total) {               
+                opp.Total_Amount_With_SalesPipeline__c = total;
+                opportunityToUpdate.add(opp); //Add account to collection to be updated
+            }
+        }
+        
+        if (!opportunityToUpdate.isEmpty()) {
+            Database.SaveResult[] saveResults = Database.update(opportunityToUpdate, false);
+            System.debug(saveResults);
+        }
+    }
+    
+    // Private Methods
+    public static Map<Id, Decimal> getOpportunityAmountsByAccount(Set<Id> quoteIds) {
+        Map<Id, Decimal> resultsByQuoteId = new Map<Id, Decimal>();
+        
+        // Summarize Won Opportunity Amounts by Quote Id
+        AggregateResult[] results = aggregateQuoteAmounts(quoteIds);
+        for (AggregateResult result : results) {
+            Id oppId = (Id) result.get('Opportunity__c');
+            Decimal total = (Decimal) result.get('totalAmount');
+            resultsByQuoteId.put(oppId, total);
+        }
+        
+        return resultsByQuoteId;
+    }
+    
+    
+    
+    private static AggregateResult[] aggregateQuoteAmount(Set<Id> oppIds) {
+        return [
+            SELECT Opportunity__c, SUM(Total_Amount__c) totalAmount
+            FROM Quote__c
+            WHERE Opportunity__c IN :oppIds
+            AND (Sales_Pipeline_Stage__c = 'Quote Not Sent' OR Sales_Pipeline_Stage__c = 'Quote Sent' OR Sales_Pipeline_Stage__c = 'Won')
+            GROUP BY Opportunity__c
+        ];
+    }
+    
+    
+}
