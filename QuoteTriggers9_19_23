@@ -1,0 +1,41 @@
+trigger QuoteTriggers on Quote__c (after insert,before insert,after Update,before delete) {
+    QuoteTriggerHandler Handler=new QuoteTriggerHandler();
+    //if (trigger.isAfter && trigger.isUpdate){
+    //   Handler.OnAfterUpdate(Trigger.oldmap,Trigger.newmap);
+    //}
+    
+    if (trigger.isAfter)
+        If(trigger.isInsert){
+            Handler.OnAfterInsert(Trigger.newmap);
+        }
+    
+    if ((trigger.isAfter && trigger.isInsert) || (trigger.isAfter && trigger.isUpdate)) {
+        Set<Id> quoteIds = new Set<Id>();
+        for (Quote__c quote : Trigger.new) {
+            quoteIds.add(quote.Id);
+        }
+        
+        QuoteTriggerHandler.updateOpportunityAmountOnQuote(quoteIds);
+    }
+    
+    if(trigger.isBefore && trigger.isDelete){
+        Set<id> quoteIds = new set<id>();
+        for(Quote__c quote: Trigger.old){
+            quoteIds.add(quote.Opportunity__c);
+        }
+        
+        Set<id> oldRecords = new set<id>();
+        for(Quote__c quote: Trigger.old){
+            oldRecords.add(quote.id);
+        }
+        QuoteTriggerHandler.updateOpportunityAmountOnQuoteDelete(quoteIds);
+    }
+    
+    //if (trigger.isBefore && trigger.isUpdate){
+    //  Handler.OnBeforeUpdate(Trigger.new);
+    //}
+    
+    if (trigger.isBefore && trigger.isInsert){
+        Handler.OnBeforeInsert(Trigger.new);
+    }
+}
